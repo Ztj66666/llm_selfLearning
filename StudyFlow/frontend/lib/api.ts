@@ -11,8 +11,8 @@ const getBaseUrl = () => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://localhost:8001/api';
     }
-    // 生产环境默认走 Nginx 代理的 /api 路径
-    return '/api';
+    // 生产环境直连后端 Render 域名 (Fallback)
+    return 'https://llm-selflearning.onrender.com/api';
   }
 
   // 3. 服务端渲染 (SSR) 环境
