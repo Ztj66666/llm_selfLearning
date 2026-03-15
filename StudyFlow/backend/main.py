@@ -35,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/tasks/history", response_model=List[schemas.Task])
+@app.get("/api/tasks/history", response_model=List[schemas.Task])
 def get_task_history(task_type: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(models.Task).filter(models.Task.is_completed == True)
     if task_type:
@@ -45,14 +45,14 @@ def get_task_history(task_type: Optional[str] = None, db: Session = Depends(get_
     tasks = query.order_by(models.Task.date.desc()).all()
     return tasks
 
-@app.get("/tasks/{day}", response_model=List[schemas.Task])
+@app.get("/api/tasks/{day}", response_model=List[schemas.Task])
 def read_tasks(day: date, db: Session = Depends(get_db)):
     tasks = crud.get_tasks_by_date(db, day)
     if not tasks:
         tasks = crud.create_daily_tasks(db, day)
     return tasks
 
-@app.put("/tasks/{task_id}", response_model=schemas.Task)
+@app.put("/api/tasks/{task_id}", response_model=schemas.Task)
 def update_task(task_id: int, task_update: schemas.TaskUpdate, db: Session = Depends(get_db)):
     # Check current status
     db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
@@ -106,11 +106,11 @@ def get_files_recursive(directory):
                 file_list.append(rel_path)
     return file_list
 
-@app.get("/knowledge", response_model=List[str])
+@app.get("/api/knowledge", response_model=List[str])
 def get_knowledge_list():
     return get_files_recursive(KNOWLEDGE_DIR)
 
-@app.get("/knowledge/{file_path:path}")
+@app.get("/api/knowledge/{file_path:path}")
 def get_knowledge_content(file_path: str):
     # 防止路径遍历攻击，确保路径在 KNOWLEDGE_DIR 内
     safe_path = os.path.normpath(os.path.join(KNOWLEDGE_DIR, file_path))
@@ -224,7 +224,7 @@ from sqlalchemy import func
 
 # ...
 
-@app.get("/stats/heatmap")
+@app.get("/api/stats/heatmap")
 def get_heatmap_stats(days: int = 60, db: Session = Depends(get_db)):
     start_date = date.today() - datetime.timedelta(days=days)
     
@@ -359,7 +359,7 @@ async def chat_stream(request: ChatRequest):
     return StreamingResponse(generate(), media_type="text/plain")
 
 # Algorithm Practice Feature
-@app.post("/tasks/{task_id}/generate-algo")
+@app.post("/api/tasks/{task_id}/generate-algo")
 async def generate_algo_problems(task_id: int, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
@@ -524,7 +524,7 @@ class AlgoSubmission(BaseModel):
     problem_index: int
     code: str
 
-@app.post("/tasks/{task_id}/submit-algo")
+@app.post("/api/tasks/{task_id}/submit-algo")
 async def submit_algo_problem(task_id: int, submission: AlgoSubmission, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task or not task.data:
@@ -638,7 +638,7 @@ async def submit_algo_problem(task_id: int, submission: AlgoSubmission, db: Sess
         raise HTTPException(status_code=500, detail=str(e))
 
 # Study Plan Feature
-@app.get("/study-plan/progress", response_model=List[schemas.StudyStageProgress])
+@app.get("/api/study-plan/progress", response_model=List[schemas.StudyStageProgress])
 def get_study_plan_progress(stage: Optional[str] = None, db: Session = Depends(get_db)):
     # Define stage order/names
     all_stages = ["基础", "中阶", "进阶", "专项", "冲刺"]
@@ -673,7 +673,7 @@ def get_study_plan_progress(stage: Optional[str] = None, db: Session = Depends(g
         
     return results
 
-@app.post("/problems/{problem_id}/complete")
+@app.post("/api/problems/{problem_id}/complete")
 def complete_problem_manual(problem_id: int, db: Session = Depends(get_db)):
     # Helper endpoint to manually mark a problem as completed for testing
     problem = db.query(models.Problem).filter(models.Problem.id == problem_id).first()
@@ -698,7 +698,7 @@ def complete_problem_manual(problem_id: int, db: Session = Depends(get_db)):
     return {"message": f"Problem {problem.title} marked as completed"}
 
 # Paper Feature
-@app.post("/papers", response_model=schemas.Paper)
+@app.post("/api/papers", response_model=schemas.Paper)
 def create_paper(paper: schemas.PaperCreate, db: Session = Depends(get_db)):
     db_paper = models.Paper(
         title=paper.title,
@@ -717,7 +717,7 @@ def create_paper(paper: schemas.PaperCreate, db: Session = Depends(get_db)):
         
     return db_paper
 
-@app.get("/papers", response_model=List[schemas.Paper])
+@app.get("/api/papers", response_model=List[schemas.Paper])
 def read_papers(type: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(models.Paper)
     if type:
@@ -730,7 +730,7 @@ def read_papers(type: Optional[str] = None, db: Session = Depends(get_db)):
             p.notes = json.loads(p.notes)
     return papers
 
-@app.put("/papers/{paper_id}", response_model=schemas.Paper)
+@app.put("/api/papers/{paper_id}", response_model=schemas.Paper)
 def update_paper(paper_id: int, paper_update: schemas.PaperUpdate, db: Session = Depends(get_db)):
     db_paper = db.query(models.Paper).filter(models.Paper.id == paper_id).first()
     if not db_paper:
@@ -758,7 +758,7 @@ def update_paper(paper_id: int, paper_update: schemas.PaperUpdate, db: Session =
 GITHUB_REPO = os.getenv("GITHUB_REPO", "facebook/react") # Default to a public repo for demo
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-@app.get("/github/commits", response_model=List[schemas.GitHubCommit])
+@app.get("/api/github/commits", response_model=List[schemas.GitHubCommit])
 async def get_github_commits():
     url = f"https://api.github.com/repos/{GITHUB_REPO}/commits"
     headers = {"Accept": "application/vnd.github.v3+json"}
@@ -790,7 +790,7 @@ async def get_github_commits():
             print(f"GitHub Fetch Error: {e}")
             return []
 
-@app.post("/github/check-daily")
+@app.post("/api/github/check-daily")
 async def check_daily_github_activity(db: Session = Depends(get_db)):
     # 1. Fetch today's commits
     commits = await get_github_commits()
@@ -825,7 +825,7 @@ async def check_daily_github_activity(db: Session = Depends(get_db)):
 
 # --- Reward Shop & Achievements ---
 
-@app.get("/profile", response_model=schemas.UserProfile)
+@app.get("/api/profile", response_model=schemas.UserProfile)
 def get_profile(db: Session = Depends(get_db)):
     profile = db.query(models.UserProfile).first()
     if not profile:
@@ -834,7 +834,7 @@ def get_profile(db: Session = Depends(get_db)):
         db.commit()
     return profile
 
-@app.get("/achievements", response_model=List[schemas.Achievement])
+@app.get("/api/achievements", response_model=List[schemas.Achievement])
 def get_achievements(db: Session = Depends(get_db)):
     # Initialize default achievements if empty
     if db.query(models.Achievement).count() == 0:
@@ -849,7 +849,7 @@ def get_achievements(db: Session = Depends(get_db)):
     
     return db.query(models.Achievement).all()
 
-@app.post("/achievements/check")
+@app.post("/api/achievements/check")
 def check_achievements(db: Session = Depends(get_db)):
     # Logic to check and unlock achievements
     achievements = db.query(models.Achievement).filter(models.Achievement.unlocked_at == None).all()
@@ -882,7 +882,7 @@ def check_achievements(db: Session = Depends(get_db)):
         
     return {"new_unlocked": unlocked_names}
 
-@app.get("/shop/rewards", response_model=List[schemas.Reward])
+@app.get("/api/shop/rewards", response_model=List[schemas.Reward])
 def get_rewards(db: Session = Depends(get_db)):
     # Initialize default rewards
     if db.query(models.Reward).count() == 0:
@@ -895,7 +895,7 @@ def get_rewards(db: Session = Depends(get_db)):
         db.commit()
     return db.query(models.Reward).filter(models.Reward.is_redeemed == False).all()
 
-@app.post("/shop/rewards", response_model=schemas.Reward)
+@app.post("/api/shop/rewards", response_model=schemas.Reward)
 def create_reward(reward: schemas.RewardCreate, db: Session = Depends(get_db)):
     db_reward = models.Reward(
         name=reward.name,
@@ -908,7 +908,7 @@ def create_reward(reward: schemas.RewardCreate, db: Session = Depends(get_db)):
     db.refresh(db_reward)
     return db_reward
 
-@app.post("/shop/redeem/{reward_id}")
+@app.post("/api/shop/redeem/{reward_id}")
 def redeem_reward(reward_id: int, db: Session = Depends(get_db)):
     reward = db.query(models.Reward).filter(models.Reward.id == reward_id).first()
     if not reward:

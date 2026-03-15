@@ -48,8 +48,8 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-后端服务将在 `http://localhost:8000` 运行。
-API 文档可见于 `http://localhost:8000/docs`。
+后端服务将在 `http://localhost:8001` 运行。
+API 文档可见于 `http://localhost:8001/docs`。
 
 ### 2. 启动前端
 

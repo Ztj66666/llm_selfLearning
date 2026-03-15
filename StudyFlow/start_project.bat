@@ -27,7 +27,7 @@ if not exist "venv" (
 )
 
 :: 在新窗口启动后端
-start "StudyFlow Backend" cmd /k "venv\Scripts\activate && uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+start "StudyFlow Backend" cmd /k "venv\Scripts\activate && uvicorn main:app --reload --host 0.0.0.0 --port 8001"
 
 echo [2/2] 正在启动前端服务 (Frontend)...
 cd ..\frontend
@@ -46,7 +46,7 @@ echo ==========================================
 echo    服务已启动！
 echo.
 echo    前端访问地址: http://localhost:3000
-echo    后端API文档:  http://localhost:8000/docs
+echo    后端API文档:  http://localhost:8001/docs
 echo.
 echo    请不要关闭弹出的两个 CMD 窗口
 echo ==========================================
