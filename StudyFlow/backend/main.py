@@ -22,10 +22,15 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Allow frontend running on localhost:3000
+@app.get("/")
+def read_root():
+    return {"message": "StudyFlow Backend is running! 🚀"}
+
+# Allow frontend running on localhost:3000 and production
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "*", # Allow all origins for easier deployment
 ]
 
 app.add_middleware(
