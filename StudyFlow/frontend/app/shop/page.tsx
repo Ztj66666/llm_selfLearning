@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getProfile, getAchievements, checkAchievements, getRewards, createReward, redeemReward } from '@/lib/api';
+import { getProfile, getAchievements, checkAchievements, getRewards, createReward, redeemReward } from '../../lib/api';
 import Link from 'next/link';
 
 export default function ShopPage() {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPaper, getPapers, updatePaper } from '@/lib/api';
+import { createPaper, getPapers, updatePaper } from '../../lib/api';
 import Link from 'next/link';
 
 export default function PapersPage() {

@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Task } from '@/types';
-import { getTasks, updateTask } from '@/lib/api';
-import TaskCard from '@/components/TaskCard';
-import ChatBot from '@/components/ChatBot';
+import { Task } from '../types';
+import { getTasks, updateTask } from '../lib/api';
+import TaskCard from '../components/TaskCard';
+import ChatBot from '../components/ChatBot';
 import Link from 'next/link';
 
-import GitHubWidget from '@/components/GitHubWidget';
-import Heatmap from '@/components/Heatmap';
-import { getProfile } from '@/lib/api';
+import GitHubWidget from '../components/GitHubWidget';
+import Heatmap from '../components/Heatmap';
+import { getProfile } from '../lib/api';
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);

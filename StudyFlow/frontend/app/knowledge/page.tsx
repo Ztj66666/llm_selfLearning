@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import KnowledgeSidebar from '@/components/KnowledgeSidebar';
-import MarkdownViewer from '@/components/MarkdownViewer';
-import ChatBot from '@/components/ChatBot';
-import { getKnowledgeList, getKnowledgeContent, updateTask, getTasks } from '@/lib/api';
-import { Task } from '@/types';
+import KnowledgeSidebar from '../../components/KnowledgeSidebar';
+import MarkdownViewer from '../../components/MarkdownViewer';
+import ChatBot from '../../components/ChatBot';
+import { getKnowledgeList, getKnowledgeContent, updateTask, getTasks } from '../../lib/api';
+import { Task } from '../../types';
 import Link from 'next/link';
-import NotesHistory from '@/components/NotesHistory';
+import NotesHistory from '../../components/NotesHistory';
 
 export default function KnowledgePage() {
   const [knowledgeFiles, setKnowledgeFiles] = useState<string[]>([]);
