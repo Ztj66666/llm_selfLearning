@@ -7,7 +7,8 @@ import models, schemas, crud
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from openai import OpenAI
+import asyncio
+from openai import AsyncOpenAI
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi.responses import StreamingResponse
@@ -145,80 +146,159 @@ class QuizReviewRequest(BaseModel):
 # Please ensure DASHSCOPE_API_KEY is set in your environment variables
 # or replace os.getenv("DASHSCOPE_API_KEY") with your actual key
 DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
-client = OpenAI(
+client = AsyncOpenAI(
     api_key=DASHSCOPE_API_KEY,
     base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 )
+
+def split_text(text: str, chunk_size: int = 6000, overlap: int = 500) -> List[str]:
+    if len(text) <= chunk_size:
+        return [text]
+    
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunks.append(text[start:end])
+        start = end - overlap
+    return chunks
 
 @app.post("/api/generate-quiz")
 async def generate_quiz(request: QuizRequest):
     if not DASHSCOPE_API_KEY:
         raise HTTPException(status_code=500, detail="API Key not configured")
 
-    # Limit context size to avoid token limit errors
-    # Strategy 1: Truncate (Simple but might lose info)
-    # Strategy 2: Summarize first (Better but slower/more expensive)
-    # Let's implement a smart truncation/sampling for now
-    
     context_content = request.content
-    if len(context_content) > 10000:
-        # If too long, take first 4000, middle 2000, last 4000
-        head = context_content[:4000]
-        mid_start = len(context_content) // 2 - 1000
-        mid = context_content[mid_start : mid_start + 2000]
-        tail = context_content[-4000:]
-        context_content = f"{head}\n\n...[Content Skipped]...\n\n{mid}\n\n...[Content Skipped]...\n\n{tail}"
+    chunks = split_text(context_content, chunk_size=6000, overlap=500)
     
-    prompt = f"""
-    请根据以下 Markdown 文档内容，生成一份技术面试测验。
+    # Strategy: Map-Reduce
+    # 1. Map: Generate questions for each chunk (in parallel)
     
-    包含两部分：
-    1. 10 道单项选择题（MCQ），每题 4 个选项。
-    2. 3 道简答题。
-    
-    文档内容片段：
-    {context_content}
-    
-    请严格以 JSON 格式返回，不要包含 markdown 标记。格式如下：
-    {{
-        "mcqs": [
-            {{
-                "question": "题目描述",
-                "options": ["选项A", "选项B", "选项C", "选项D"],
-                "answer": "选项A" 
-            }}
-        ],
-        "short_answers": [
-            {{
-                "question": "简答题1题目",
-                "standard_answer": "标准答案要点..."
-            }}
-        ]
-    }}
-    注意：answer 字段必须完全匹配 options 中的某一项。
-    """
+    async def process_chunk(chunk: str, index: int):
+        prompt = f"""
+        请根据以下文档片段，生成 2 道单项选择题（MCQ）和 1 道简答题。
+        
+        文档片段：
+        {chunk}
+        
+        请严格以 JSON 格式返回，不要包含 markdown 标记。格式如下：
+        {{
+            "mcqs": [
+                {{
+                    "question": "题目描述",
+                    "options": ["选项A", "选项B", "选项C", "选项D"],
+                    "answer": "选项A" 
+                }}
+            ],
+            "short_answers": [
+                {{
+                    "question": "简答题题目",
+                    "standard_answer": "标准答案要点"
+                }}
+            ]
+        }}
+        """
+        try:
+            completion = await client.chat.completions.create(
+                model="qwen3.5-plus",
+                messages=[{"role": "user", "content": prompt}],
+                extra_body={"enable_thinking": True}
+            )
+            content = completion.choices[0].message.content
+            clean_content = content.replace("```json", "").replace("```", "").strip()
+            return json.loads(clean_content)
+        except Exception as e:
+            print(f"Chunk {index} generation failed: {e}")
+            return {"mcqs": [], "short_answers": []}
 
+    # If only 1 chunk, use the original logic (requesting full 10+3) to save tokens/calls
+    if len(chunks) == 1:
+        prompt = f"""
+        请根据以下 Markdown 文档内容，生成一份技术面试测验。
+        
+        包含两部分：
+        1. 10 道单项选择题（MCQ），每题 4 个选项。
+        2. 3 道简答题。
+        
+        文档内容片段：
+        {chunks[0]}
+        
+        请严格以 JSON 格式返回，不要包含 markdown 标记。格式如下：
+        {{
+            "mcqs": [
+                {{
+                    "question": "题目描述",
+                    "options": ["选项A", "选项B", "选项C", "选项D"],
+                    "answer": "选项A" 
+                }}
+            ],
+            "short_answers": [
+                {{
+                    "question": "简答题1题目",
+                    "standard_answer": "标准答案要点..."
+                }}
+            ]
+        }}
+        注意：answer 字段必须完全匹配 options 中的某一项。
+        """
+        try:
+            completion = await client.chat.completions.create(
+                model="qwen3.5-plus",
+                messages=[{"role": "user", "content": prompt}],
+                extra_body={"enable_thinking": True}
+            )
+            response_content = completion.choices[0].message.content
+            clean_content = response_content.replace("```json", "").replace("```", "").strip()
+            return json.loads(clean_content)
+        except Exception as e:
+            print(f"AI Generation Error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Multiple chunks: Run in parallel
+    results = await asyncio.gather(*[process_chunk(chunk, i) for i, chunk in enumerate(chunks)])
+    
+    # 2. Reduce: Aggregate and Select
+    all_mcqs = []
+    all_short_answers = []
+    for res in results:
+        all_mcqs.extend(res.get("mcqs", []))
+        all_short_answers.extend(res.get("short_answers", []))
+        
+    # Serialize for the reducer prompt
+    combined_questions = json.dumps({
+        "mcqs": all_mcqs,
+        "short_answers": all_short_answers
+    }, ensure_ascii=False)
+    
+    reduce_prompt = f"""
+    我有一系列从长文档不同片段中生成的题目。请你作为“总编辑”，从中筛选出最好的题目，组成一份完整的测验。
+    
+    候选题目池：
+    {combined_questions}
+    
+    要求：
+    1. 选出 10 道最佳的单项选择题（MCQ）。确保覆盖文档的不同部分，去除重复或相似的题目。
+    2. 选出 3 道最佳的简答题。
+    
+    请严格以 JSON 格式返回最终结果，格式同上。
+    """
+    
     try:
-        completion = client.chat.completions.create(
+        completion = await client.chat.completions.create(
             model="qwen3.5-plus",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": reduce_prompt}],
             extra_body={"enable_thinking": True}
         )
         response_content = completion.choices[0].message.content
-        
-        # Parse JSON
         clean_content = response_content.replace("```json", "").replace("```", "").strip()
-        try:
-            data = json.loads(clean_content)
-        except json.JSONDecodeError:
-            # Fallback/Retry logic could be added here, but for now return error or partial
-            print("JSON Parse Error:", clean_content)
-            raise HTTPException(status_code=500, detail="Failed to parse AI response")
-
-        return data
+        return json.loads(clean_content)
     except Exception as e:
-        print(f"AI Generation Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Reduce Step Error: {e}")
+        # Fallback: Just take the first few
+        return {
+            "mcqs": all_mcqs[:10],
+            "short_answers": all_short_answers[:3]
+        }
 
 from sqlalchemy import func
 
@@ -280,7 +360,7 @@ async def review_quiz(request: QuizReviewRequest, db: Session = Depends(get_db))
     """
 
     try:
-        completion = client.chat.completions.create(
+        completion = await client.chat.completions.create(
             model="qwen3.5-plus",
             messages=[{"role": "user", "content": prompt}],
             extra_body={"enable_thinking": True}
@@ -327,28 +407,65 @@ async def chat_stream(request: ChatRequest):
     if not DASHSCOPE_API_KEY:
         raise HTTPException(status_code=500, detail="API Key not configured")
 
-    system_prompt = "你是一个专业的技术面试辅导助手。请回答用户关于技术、编程和面试的问题。"
-    if request.context:
-        system_prompt += f"\n\n用户正在阅读的文章标题：{request.title}\n文章内容片段：\n{request.context[:1000]}...\n请根据以上上下文回答用户问题。"
+    context = request.context or ""
+    # Map-Reduce logic for long context
+    if len(context) > 10000:
+        chunks = split_text(context, chunk_size=6000, overlap=500)
+        
+        async def check_chunk(chunk: str):
+            prompt = f"""
+            用户问题：{request.message}
+            
+            请阅读以下文档片段，如果其中包含回答该问题所需的信息，请提取出来（可以摘录或总结）。
+            如果片段与问题无关，请直接返回 "NO_INFO"。
+            
+            文档片段：
+            {chunk}
+            """
+            try:
+                completion = await client.chat.completions.create(
+                    model="qwen3.5-plus",
+                    messages=[{"role": "user", "content": prompt}],
+                    extra_body={"enable_thinking": True}
+                )
+                content = completion.choices[0].message.content
+                if "NO_INFO" in content and len(content) < 20:
+                    return ""
+                return content
+            except:
+                return ""
+
+        # Run Map phase in parallel
+        # Note: If context is extremely huge, might want to limit concurrency
+        results = await asyncio.gather(*[check_chunk(c) for c in chunks])
+        combined_info = "\n\n".join([r for r in results if r])
+        
+        if not combined_info.strip():
+             system_prompt = "你是一个专业的技术面试辅导助手。请回答用户关于技术、编程和面试的问题。"
+        else:
+             system_prompt = f"你是一个专业的技术面试辅导助手。\n以下是从长文档中提取的相关信息：\n{combined_info[:15000]}\n\n请根据以上信息回答用户问题：{request.message}"
+    else:
+        system_prompt = "你是一个专业的技术面试辅导助手。请回答用户关于技术、编程和面试的问题。"
+        if context:
+            system_prompt += f"\n\n用户正在阅读的文章标题：{request.title}\n文章内容片段：\n{context[:2000]}...\n请根据以上上下文回答用户问题。"
 
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": request.message}
     ]
 
-    def generate():
+    async def generate():
         try:
-            completion = client.chat.completions.create(
+            completion = await client.chat.completions.create(
                 model="qwen3.5-plus",
                 messages=messages,
                 stream=True,
                 extra_body={"enable_thinking": True}
             )
-            for chunk in completion:
+            async for chunk in completion:
                 # Handle reasoning content if available (for DeepSeek-like models)
                 delta = chunk.choices[0].delta
                 if hasattr(delta, "reasoning_content") and delta.reasoning_content:
-                     # You might want to send this as a specific event type or just ignore for now
                      pass
                 
                 if chunk.choices[0].delta.content:
@@ -500,7 +617,7 @@ async def generate_algo_problems(task_id: int, db: Session = Depends(get_db)):
     
     recommendation_text = "今日算法挑战已生成！"
     try:
-        completion = client.chat.completions.create(
+        completion = await client.chat.completions.create(
             model="qwen3.5-plus",
             messages=[{"role": "user", "content": rec_prompt}],
             extra_body={"enable_thinking": True}
@@ -564,7 +681,7 @@ async def submit_algo_problem(task_id: int, submission: AlgoSubmission, db: Sess
     """
 
     try:
-        completion = client.chat.completions.create(
+        completion = await client.chat.completions.create(
             model="qwen3.5-plus",
             messages=[{"role": "user", "content": prompt}],
             extra_body={"enable_thinking": True}
