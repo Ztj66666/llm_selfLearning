@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Task } from '@/types';
-import { getTasks, updateTask } from '@/lib/api';
+import { Task } from '../types';
+import { getTasks, updateTask } from '../lib/api';
 import TaskCard from './TaskCard';
 
 export default function TaskList() {

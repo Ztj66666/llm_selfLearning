@@ -1,6 +1,6 @@
 'use client';
 
-import { Task } from '@/types';
+import { Task } from '../types';
 import { useState, useEffect } from 'react';
 import AlgoModal from './AlgoModal';
 

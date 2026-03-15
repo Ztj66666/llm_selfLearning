@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { generateAlgoProblems, submitAlgoProblem } from '@/lib/api';
+import { generateAlgoProblems, submitAlgoProblem } from '../lib/api';
 
 interface Problem {
   id: number;

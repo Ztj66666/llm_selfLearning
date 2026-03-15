@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getGitHubCommits, checkDailyGitHub } from '@/lib/api';
+import { getGitHubCommits, checkDailyGitHub } from '../lib/api';
 
 export default function GitHubWidget() {
   const [commits, setCommits] = useState<any[]>([]);
