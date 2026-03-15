@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getHeatmapStats } from '@/lib/api';
+import { getHeatmapStats } from '../lib/api';
 
 export default function Heatmap() {
   const [data, setData] = useState<Record<string, number>>({});
