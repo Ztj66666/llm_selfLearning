@@ -4,7 +4,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import QuizModal from './QuizModal';
-import { generateQuiz } from '@/lib/api';
+import { generateQuiz } from '../lib/api';
 
 interface MarkdownViewerProps {
   content: string;
