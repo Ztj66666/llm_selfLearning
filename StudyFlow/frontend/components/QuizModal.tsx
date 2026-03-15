@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { reviewQuiz } from '@/lib/api';
+import { reviewQuiz } from '../lib/api';
 
 interface QuizModalProps {
   isOpen: boolean;
@@ -79,10 +79,10 @@ export default function QuizModal({ isOpen, onClose, data, context, onComplete }
       setOverallFeedback(resData.overall_feedback);
       setIsSubmitted(true);
       
-      // Auto check-in if score > 80
-      if (resData.total_score > 80 && onComplete) {
+      // Auto check-in if score >= 80
+      if (resData.total_score >= 80 && onComplete) {
           setTimeout(() => {
-              alert(`🎉 恭喜！最终得分 ${resData.total_score} 分（>80），已自动为您打卡！`);
+              alert(`🎉 恭喜！最终得分 ${resData.total_score} 分（>=80），已自动为您打卡！`);
               onComplete();
           }, 500);
       }
