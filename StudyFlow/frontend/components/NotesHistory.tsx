@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getTaskHistory } from '@/lib/api';
-import { Task } from '@/types';
+import { getTaskHistory } from '../lib/api';
+import { Task } from '../types';
 
 export default function NotesHistory() {
   const [tasks, setTasks] = useState<Task[]>([]);
