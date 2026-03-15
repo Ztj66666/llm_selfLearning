@@ -19,7 +19,10 @@ COPY . .
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.
-# ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Fix for module resolution issues in Docker
+ENV TS_NODE_PROJECT=tsconfig.json
 
 RUN npm run build
 
